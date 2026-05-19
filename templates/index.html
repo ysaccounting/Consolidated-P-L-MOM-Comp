@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Consolidated P&L Builder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:             #ECEEF1;
+      --card:           #FFFFFF;
+      --border:         #D8DCE3;
+      --border-dash:    #C4C9D4;
+      --text:           #1C2333;
+      --text-muted:     #8A91A0;
+      --text-sub:       #6B7280;
+      --label:          #6B7280;
+      --accent:         #5B6B9A;
+      --drop-hover:     #F4F5F8;
+      --btn-clear-text: #4B5563;
+      --success:        #2E7D32;
+      --error:          #C62828;
+      --radius:         12px;
+      --radius-sm:      8px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 6px 20px rgba(0,0,0,0.05);
+      padding: 2rem 2rem 1.75rem;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.01em;
+      margin-bottom: 0.2rem;
+    }
+
+    .card-sub {
+      font-size: 0.82rem;
+      color: var(--text-sub);
+      font-weight: 400;
+      margin-bottom: 1.1rem;
+    }
+
+    .info-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      cursor: pointer;
+      margin-bottom: 1.4rem;
+      user-select: none;
+      width: fit-content;
+    }
+
+    .info-toggle .chevron {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      display: inline-block;
+      transition: transform 0.18s;
+      line-height: 1;
+    }
+
+    .info-toggle.open .chevron { transform: rotate(90deg); }
+
+    .info-body {
+      display: none;
+      font-size: 0.78rem;
+      color: var(--text-sub);
+      background: #F7F8FA;
+      border-radius: 6px;
+      padding: 0.7rem 0.9rem;
+      margin-top: -1rem;
+      margin-bottom: 1.3rem;
+      line-height: 1.6;
+    }
+
+    .info-body.open { display: block; }
+
+    .section-label {
+      font-size: 0.67rem;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--label);
+      margin-bottom: 0.55rem;
+    }
+
+    .drop-zone {
+      border: 1.5px dashed var(--border-dash);
+      border-radius: var(--radius-sm);
+      padding: 1.6rem 1.25rem 1.4rem;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      background: var(--card);
+      transition: background 0.15s, border-color 0.15s;
+      margin-bottom: 1.25rem;
+    }
+
+    .drop-zone:hover, .drop-zone.dragover {
+      background: var(--drop-hover);
+      border-color: var(--accent);
+    }
+
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .drop-icon { margin-bottom: 0.55rem; }
+
+    .drop-icon svg {
+      width: 26px; height: 26px;
+      stroke: #B0B7C6;
+      transition: stroke 0.15s;
+    }
+
+    .drop-zone:hover .drop-icon svg,
+    .drop-zone.dragover .drop-icon svg { stroke: var(--accent); }
+
+    .drop-main {
+      font-size: 0.82rem;
+      color: var(--text-sub);
+    }
+
+    .drop-main strong { font-weight: 600; color: var(--text); }
+    .drop-main .browse { color: var(--accent); text-decoration: underline; }
+
+    .drop-hint {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+      line-height: 1.4;
+    }
+
+    .drop-filelist {
+      margin-top: 0.45rem;
+      font-size: 0.76rem;
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .meta-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 76px;
+      gap: 0.7rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .meta-field { display: flex; flex-direction: column; gap: 0.3rem; }
+
+    .meta-field label {
+      font-size: 0.67rem;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--label);
+    }
+
+    select, input[type="text"] {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.46rem 0.62rem;
+      font-family: inherit;
+      font-size: 0.82rem;
+      color: var(--text);
+      background: var(--card);
+      outline: none;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239CA3AF' stroke-width='1.5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.55rem center;
+      padding-right: 1.8rem;
+    }
+
+    select:focus, input[type="text"]:focus { border-color: var(--accent); }
+
+    .btn-row {
+      display: flex;
+      gap: 0.65rem;
+      align-items: stretch;
+    }
+
+    .btn-primary {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      padding: 0.68rem 1rem;
+      background: var(--accent);
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    .btn-primary:hover { opacity: 0.87; }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .btn-primary svg {
+      width: 14px; height: 14px;
+      stroke: currentColor;
+      flex-shrink: 0;
+    }
+
+    .btn-clear {
+      padding: 0.68rem 1.1rem;
+      background: #fff;
+      color: var(--btn-clear-text);
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-clear:hover { background: #F3F4F6; }
+
+    .status {
+      margin-top: 0.8rem;
+      font-size: 0.79rem;
+      text-align: center;
+      min-height: 1.1em;
+      color: var(--text-muted);
+    }
+
+    .status.error   { color: var(--error); }
+    .status.success { color: var(--success); }
+
+    .spinner {
+      display: inline-block;
+      width: 11px; height: 11px;
+      border: 1.5px solid var(--accent);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 5px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="card-title">Consolidated P&amp;L Builder</div>
+    <div class="card-sub">Month-over-month P&amp;L comparison &amp; variance report</div>
+
+    <div class="info-toggle" id="infoToggle">
+      <span class="chevron">›</span> What does this generate?
+    </div>
+    <div class="info-body" id="infoBody">
+      Upload two monthly QuickBooks P&amp;L exports to produce a formatted Excel workbook with all entities side-by-side — including $ and % variance columns, Gross Profit Margin, and color-coded summary rows.
+    </div>
+
+    <form id="plForm">
+
+      <div class="section-label">Month 1 File</div>
+      <div class="drop-zone" id="zone1">
+        <input type="file" name="file1" id="file1" accept=".xlsx,.xls" required />
+        <div class="drop-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 15V3m0 0L8.5 6.5M12 3l3.5 3.5"/>
+            <path d="M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2"/>
+          </svg>
+        </div>
+        <div class="drop-main">Drag &amp; drop your <strong>Excel</strong> file here, or <span class="browse">browse</span></div>
+        <div class="drop-hint">QuickBooks P&amp;L export (.xlsx)</div>
+        <div class="drop-filelist" id="name1"></div>
+      </div>
+
+      <div class="section-label">Month 2 File</div>
+      <div class="drop-zone" id="zone2">
+        <input type="file" name="file2" id="file2" accept=".xlsx,.xls" required />
+        <div class="drop-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 15V3m0 0L8.5 6.5M12 3l3.5 3.5"/>
+            <path d="M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2"/>
+          </svg>
+        </div>
+        <div class="drop-main">Drag &amp; drop your <strong>Excel</strong> file here, or <span class="browse">browse</span></div>
+        <div class="drop-hint">QuickBooks P&amp;L export (.xlsx)</div>
+        <div class="drop-filelist" id="name2"></div>
+      </div>
+
+      <div class="meta-row">
+        <div class="meta-field">
+          <label for="month1">Month 1</label>
+          <select name="month1" id="month1">
+            {% for m in months %}
+            <option value="{{ m }}" {% if m == 'March' %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="meta-field">
+          <label for="month2">Month 2</label>
+          <select name="month2" id="month2">
+            {% for m in months %}
+            <option value="{{ m }}" {% if m == 'April' %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="meta-field">
+          <label for="year">Year</label>
+          <input type="text" name="year" id="year" value="2026" maxlength="4" />
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button type="submit" class="btn-primary" id="submitBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 16V4m0 12l-3-3m3 3 3-3M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2"/>
+          </svg>
+          Run &amp; Export
+        </button>
+        <button type="button" class="btn-clear" id="clearBtn">Clear</button>
+      </div>
+
+      <div class="status" id="status"></div>
+    </form>
+  </div>
+
+  <script>
+    const toggle = document.getElementById('infoToggle');
+    const infoBody = document.getElementById('infoBody');
+    toggle.addEventListener('click', () => {
+      toggle.classList.toggle('open');
+      infoBody.classList.toggle('open');
+    });
+
+    ['1','2'].forEach(n => {
+      const input = document.getElementById('file' + n);
+      const nameEl = document.getElementById('name' + n);
+      const zone   = document.getElementById('zone' + n);
+
+      input.addEventListener('change', () => {
+        nameEl.textContent = input.files[0]?.name || '';
+      });
+      zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+      zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('dragover');
+        const f = e.dataTransfer.files[0];
+        if (f) { input.files = e.dataTransfer.files; nameEl.textContent = f.name; }
+      });
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      document.getElementById('plForm').reset();
+      ['1','2'].forEach(n => document.getElementById('name' + n).textContent = '');
+      const s = document.getElementById('status');
+      s.textContent = '';
+      s.className = 'status';
+    });
+
+    document.getElementById('plForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const status = document.getElementById('status');
+      btn.disabled = true;
+      status.className = 'status';
+      status.innerHTML = '<span class="spinner"></span>Building report…';
+
+      try {
+        const res = await fetch('/generate', { method: 'POST', body: new FormData(e.target) });
+        if (!res.ok) {
+          const err = await res.json();
+          status.className = 'status error';
+          status.textContent = '⚠ ' + (err.error || 'Something went wrong.');
+        } else {
+          const blob = await res.blob();
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = `Combined_PL_${month1.value}_${month2.value}_${year.value}.xlsx`;
+          a.click();
+          URL.revokeObjectURL(a.href);
+          status.className = 'status success';
+          status.textContent = '✓ Report downloaded.';
+        }
+      } catch {
+        status.className = 'status error';
+        status.textContent = '⚠ Network error. Please try again.';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
