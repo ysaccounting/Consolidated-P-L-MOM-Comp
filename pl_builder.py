@@ -124,11 +124,16 @@ def write_pl_sheet(ws, companies, all_labels, mar_map, apr_map,
     spacer_cols = {company_start_col(ci) + 4 for ci in range(n_companies - 1)}
     pct_cols = {company_start_col(ci) + 3 for ci in range(n_companies)}
 
-    # Build set of labels that have at least one non-zero value for these companies
+    # Build set of labels that have at least one non-zero value for these companies.
+    # Exclude 'Total' from this check — Total aggregates everything including solo-tab
+    # companies, so it would cause rows to appear even when no entity on this tab has data.
+    non_total_companies = [(i, name) for i, name in companies if name != 'Total']
+
     def company_has_data(label):
         mv = mar_map.get(label, [])
         av = apr_map.get(label, [])
-        for orig_idx, _ in companies:
+        check_list = non_total_companies if non_total_companies else companies
+        for orig_idx, _ in check_list:
             m = mv[orig_idx] if orig_idx < len(mv) else None
             a = av[orig_idx] if orig_idx < len(av) else None
             if (isinstance(m, (int, float)) and m != 0) or (isinstance(a, (int, float)) and a != 0):
@@ -189,12 +194,27 @@ def write_pl_sheet(ws, companies, all_labels, mar_map, apr_map,
         apr_vals = apr_map.get(label, [])
         write_data = style != 'section' or has_any_data(label)
 
+        # Pre-compute tab-scoped totals (sum of non-Total companies on this tab)
+        non_total = [(i, n) for i, n in companies if n != 'Total']
+        tab_mar_total = tab_apr_total = None
+        if write_data and non_total:
+            m_vals = [mar_vals[i] for i, _ in non_total
+                      if i < len(mar_vals) and isinstance(mar_vals[i], (int, float))]
+            a_vals = [apr_vals[i] for i, _ in non_total
+                      if i < len(apr_vals) and isinstance(apr_vals[i], (int, float))]
+            if m_vals: tab_mar_total = sum(m_vals)
+            if a_vals: tab_apr_total = sum(a_vals)
+
         for ci, (orig_idx, company) in enumerate(companies):
             cs = company_start_col(ci)
-            mv = mar_vals[orig_idx] if orig_idx < len(mar_vals) else None
-            av = apr_vals[orig_idx] if orig_idx < len(apr_vals) else None
-            mv = mv if isinstance(mv, (int, float)) else None
-            av = av if isinstance(av, (int, float)) else None
+            if company == 'Total':
+                mv = tab_mar_total
+                av = tab_apr_total
+            else:
+                mv = mar_vals[orig_idx] if orig_idx < len(mar_vals) else None
+                av = apr_vals[orig_idx] if orig_idx < len(apr_vals) else None
+                mv = mv if isinstance(mv, (int, float)) else None
+                av = av if isinstance(av, (int, float)) else None
 
             delta = pct = None
             if write_data:
