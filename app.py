@@ -1,6 +1,7 @@
 from flask import Flask, request, send_file, render_template, jsonify
 import io
 import os
+import re
 from openpyxl import load_workbook
 from pl_builder import build_combined_pl
 
@@ -20,22 +21,20 @@ def allowed_file(filename):
 
 
 def detect_month_year(file_bytes):
-    """Read the month/year label from the second row of the P&L sheet."""
+    """Read the month/year label from the header rows of the P&L sheet."""
     try:
         wb = load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
         ws = wb.active
-        for i, row in enumerate(ws.iter_rows(max_row=5, values_only=True)):
+        for row in ws.iter_rows(max_row=5, values_only=True):
             val = row[0]
             if val and isinstance(val, str):
                 for month in MONTHS:
                     if month in val:
-                        # Extract year if present
-                        import re
                         year_match = re.search(r'\b(20\d{2})\b', val)
                         year = year_match.group(1) if year_match else str(__import__('datetime').date.today().year)
                         return {'month': month, 'year': year, 'monthIndex': MONTHS.index(month)}
         return None
-    except Exception as e:
+    except Exception:
         return None
 
 
@@ -74,7 +73,6 @@ def generate():
     b1 = file1.read()
     b2 = file2.read()
 
-    # Detect months from content
     m1 = detect_month_year(b1)
     m2 = detect_month_year(b2)
 

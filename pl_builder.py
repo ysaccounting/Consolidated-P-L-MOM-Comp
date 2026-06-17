@@ -4,6 +4,8 @@ from openpyxl.utils import get_column_letter
 from openpyxl.cell.cell import MergedCell
 import io
 
+SOLO_TAB_COMPANIES = {'YS Affiliates'}  # companies that get their own tab
+
 
 def read_pl_sheet(ws):
     headers = None
@@ -30,39 +32,44 @@ def extract_ordered_rows(rows):
     return result
 
 
-def build_combined_pl(mar_file, apr_file, mar_label="March", apr_label="April", year="2026"):
-    """
-    Build combined P&L workbook from two file-like objects (or paths).
-    Returns bytes of the xlsx file.
-    """
-    mar_wb = load_workbook(mar_file, data_only=True)
-    apr_wb = load_workbook(apr_file, data_only=True)
-    mar_ws = mar_wb.active
-    apr_ws = apr_wb.active
+def merge_label_orders(primary_labels, secondary_labels):
+    known = set(primary_labels)
+    result = list(primary_labels)
+    for i, label in enumerate(secondary_labels):
+        if label in known:
+            continue
+        insert_after = None
+        for j in range(i - 1, -1, -1):
+            if secondary_labels[j] in known:
+                insert_after = secondary_labels[j]
+                break
+        if insert_after and insert_after in result:
+            pos = result.index(insert_after) + 1
+            result.insert(pos, label)
+        else:
+            result.append(label)
+        known.add(label)
+    return result
 
-    mar_headers, mar_rows = read_pl_sheet(mar_ws)
-    apr_headers, apr_rows = read_pl_sheet(apr_ws)
 
-    all_companies = mar_headers[1:]
-    companies = [(i, name) for i, name in enumerate(all_companies) if name != 'Eliminations']
+def write_pl_sheet(ws, companies, all_labels, mar_map, apr_map,
+                   mar_label, apr_label, year,
+                   SKIP_ROWS, TOTAL_ROWS, SECTION_DIVIDERS, SECTION_LABEL_ONLY):
+    """Write a P&L sheet for the given list of (orig_idx, name) companies."""
 
-    mar_ordered = extract_ordered_rows(mar_rows)
-    apr_ordered = extract_ordered_rows(apr_rows)
-    mar_map = {r[0]: r[1] for r in mar_ordered}
-    apr_map = {r[0]: r[1] for r in apr_ordered}
+    NAVY = "1F2D5A"
+    TEAL = "006D6F"
+    LTGRAY = "F2F3F5"
+    WHITE = "FFFFFF"
+    BLUE_HDR = "E3EAF5"
+    TOTAL_BG = "C8D6EF"
 
-    mar_labels = [r[0] for r in mar_ordered]
-    apr_labels = [r[0] for r in apr_ordered]
-    all_labels = list(mar_labels)
-    for lbl in apr_labels:
-        if lbl not in all_labels:
-            all_labels.append(lbl)
+    n_companies = len(companies)
 
-    SECTION_LABEL_ONLY = {'Miscellaneous Fees', 'Professional Fees', 'Salaries', 'K-1 Income'}
-    SKIP_ROWS = {'Consolidated P&L', 'March 2026', 'April 2026',
-                 f'{mar_label} {year}', f'{apr_label} {year}'}
-    TOTAL_ROWS = {l for l in all_labels if l and str(l).startswith('Total for')}
-    SECTION_DIVIDERS = {'Income', 'Cost of Goods Sold', 'Expenses', 'Other Income', 'Other Expenses'}
+    def company_start_col(ci):
+        return 2 + ci * 5
+
+    total_cols = 1 + n_companies * 5 - 1
 
     def row_style(label):
         if label == 'Gross Profit': return 'gross'
@@ -79,24 +86,7 @@ def build_combined_pl(mar_file, apr_file, mar_label="March", apr_label="April", 
         return (any(isinstance(v, (int, float)) and v != 0 for v in mv) or
                 any(isinstance(v, (int, float)) and v != 0 for v in av))
 
-    NAVY = "1F2D5A"
-    TEAL = "006D6F"
-    LTGRAY = "F2F3F5"
-    WHITE = "FFFFFF"
-    BLUE_HDR = "E3EAF5"
-    TOTAL_BG = "C8D6EF"
-
-    n_companies = len(companies)
-
-    def company_start_col(ci):
-        return 2 + ci * 5
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Combined P&L"
-
-    total_cols = 1 + n_companies * 5 - 1
-
+    # Title
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols)
     tc = ws.cell(row=1, column=1, value=f"Consolidated P&L — {mar_label} vs {apr_label} {year}")
     tc.font = Font(bold=True, size=14, color=WHITE, name="Arial")
@@ -104,6 +94,7 @@ def build_combined_pl(mar_file, apr_file, mar_label="March", apr_label="April", 
     tc.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 24
 
+    # Company headers row
     ws.cell(row=2, column=1).fill = PatternFill("solid", fgColor=NAVY)
     for ci, (orig_idx, company) in enumerate(companies):
         cs = company_start_col(ci)
@@ -117,6 +108,7 @@ def build_combined_pl(mar_file, apr_file, mar_label="March", apr_label="April", 
             ws.cell(row=2, column=cs + 4).fill = PatternFill("solid", fgColor=NAVY)
     ws.row_dimensions[2].height = 30
 
+    # Sub-headers
     ws.cell(row=3, column=1).fill = PatternFill("solid", fgColor=NAVY)
     for ci in range(n_companies):
         cs = company_start_col(ci)
@@ -278,6 +270,58 @@ def build_combined_pl(mar_file, apr_file, mar_label="March", apr_label="April", 
         ws.column_dimensions[get_column_letter(col)].width = 3
 
     ws.freeze_panes = "B4"
+
+
+def build_combined_pl(mar_file, apr_file, mar_label="March", apr_label="April", year="2026"):
+    mar_wb = load_workbook(mar_file, data_only=True)
+    apr_wb = load_workbook(apr_file, data_only=True)
+    mar_ws = mar_wb.active
+    apr_ws = apr_wb.active
+
+    mar_headers, mar_rows = read_pl_sheet(mar_ws)
+    apr_headers, apr_rows = read_pl_sheet(apr_ws)
+
+    all_companies = mar_headers[1:]
+
+    # Split into main companies and solo-tab companies
+    main_companies = [(i, name) for i, name in enumerate(all_companies)
+                      if name != 'Eliminations' and name not in SOLO_TAB_COMPANIES]
+    solo_companies = [(i, name) for i, name in enumerate(all_companies)
+                      if name in SOLO_TAB_COMPANIES]
+    # Total always goes last on main sheet
+    total_companies = [(i, name) for i, name in main_companies if name == 'Total']
+    main_companies = [(i, name) for i, name in main_companies if name != 'Total'] + total_companies
+
+    mar_ordered = extract_ordered_rows(mar_rows)
+    apr_ordered = extract_ordered_rows(apr_rows)
+    mar_map = {r[0]: r[1] for r in mar_ordered}
+    apr_map = {r[0]: r[1] for r in apr_ordered}
+
+    mar_labels = [r[0] for r in mar_ordered]
+    apr_labels = [r[0] for r in apr_ordered]
+    all_labels = merge_label_orders(mar_labels, apr_labels)
+
+    SECTION_LABEL_ONLY = {'Miscellaneous Fees', 'Professional Fees', 'Salaries', 'K-1 Income'}
+    SKIP_ROWS = {'Consolidated P&L', 'March 2026', 'April 2026',
+                 f'{mar_label} {year}', f'{apr_label} {year}'}
+    TOTAL_ROWS = {l for l in all_labels if l and str(l).startswith('Total for')}
+    SECTION_DIVIDERS = {'Income', 'Cost of Goods Sold', 'Expenses', 'Other Income', 'Other Expenses'}
+
+    shared_args = (all_labels, mar_map, apr_map, mar_label, apr_label, year,
+                   SKIP_ROWS, TOTAL_ROWS, SECTION_DIVIDERS, SECTION_LABEL_ONLY)
+
+    wb = Workbook()
+
+    # Main sheet
+    ws_main = wb.active
+    ws_main.title = "Combined P&L"
+    write_pl_sheet(ws_main, main_companies, *shared_args)
+
+    # Solo tabs
+    for orig_idx, name in solo_companies:
+        tab_title = name.replace(' Tickets', '').replace(' LLC', '').strip()[:31]
+        ws_solo = wb.create_sheet(title=tab_title)
+        write_pl_sheet(ws_solo, [(orig_idx, name)], *shared_args)
 
     buf = io.BytesIO()
     wb.save(buf)

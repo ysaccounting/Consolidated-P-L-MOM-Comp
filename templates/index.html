@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Consolidated MOM Comparative P&L Builder</title>
+  <title>Consolidated P&L Builder</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
@@ -135,15 +135,15 @@
     }
 
     .file-pill-month {
-      color: var(--text-muted);
       font-size: 0.72rem;
       white-space: nowrap;
       flex-shrink: 0;
+      color: var(--text-muted);
     }
 
-    .file-pill-month.detected { color: var(--success); }
+    .file-pill-month.detected  { color: var(--success); }
     .file-pill-month.detecting { color: var(--text-muted); font-style: italic; }
-    .file-pill-month.failed { color: var(--error); }
+    .file-pill-month.failed    { color: var(--error); }
 
     .file-pill-remove {
       background: none;
@@ -193,7 +193,6 @@
     .btn-primary:hover { opacity: 0.87; }
     .btn-primary:active { transform: scale(0.98); }
     .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-
     .btn-primary svg { width: 14px; height: 14px; stroke: currentColor; flex-shrink: 0; }
 
     .btn-clear {
@@ -238,7 +237,8 @@
 </head>
 <body>
   <div class="card">
-    <div class="card-title">Consolidated MOM Comparative P&amp;L Builder</div>
+    <div class="card-title">Consolidated P&amp;L Builder</div>
+    <div class="card-sub">Month-over-month P&amp;L comparison &amp; variance report</div>
 
     <form id="plForm">
       <div class="drop-zone" id="dropZone">
@@ -250,7 +250,7 @@
           </svg>
         </div>
         <div class="drop-main">Drag &amp; drop your <strong>Excel</strong> files here, or <span class="browse">browse</span></div>
-        <div class="drop-hint">Two QBO consolidated P&amp;L reports, displayed by Company</div>
+        <div class="drop-hint">Two QuickBooks P&amp;L exports (.xlsx) — months detected automatically</div>
         <div class="file-list" id="fileList"></div>
       </div>
 
@@ -271,9 +271,8 @@
   </div>
 
   <script>
-    // Each entry: { file, month, year, monthIndex, state: 'detecting'|'detected'|'failed' }
     let files = [];
-    let detecting = 0; // count of in-flight /detect calls
+    let detecting = 0;
 
     const dropZone  = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
@@ -324,9 +323,7 @@
         fileList.appendChild(pill);
       });
 
-      // Show error if any failed
-      const failed = files.filter(f => f.state === 'failed');
-      if (failed.length) {
+      if (files.some(f => f.state === 'failed')) {
         zoneError.textContent = '⚠ Could not detect month from one or more files. Ensure the file is a valid QuickBooks P&L export.';
       }
 
@@ -334,10 +331,11 @@
     }
 
     function updateSubmit() {
-      const allDetected = files.length === 2 &&
-                          files.every(f => f.state === 'detected') &&
-                          detecting === 0;
-      submitBtn.disabled = !allDetected;
+      submitBtn.disabled = !(
+        files.length === 2 &&
+        files.every(f => f.state === 'detected') &&
+        detecting === 0
+      );
     }
 
     async function detectFile(entry) {
@@ -362,7 +360,6 @@
         entry.state = 'failed';
       } finally {
         detecting--;
-        // Re-sort by monthIndex after detection
         files.sort((a, b) => (a.monthIndex ?? 999) - (b.monthIndex ?? 999));
         renderFileList();
       }
@@ -373,7 +370,6 @@
         if (files.length >= 2) break;
         if (!file.name.match(/\.(xlsx|xls)$/i)) continue;
         if (files.find(f => f.file.name === file.name)) continue;
-
         const entry = { file, month: null, year: null, monthIndex: 999, state: 'detecting' };
         files.push(entry);
         detectFile(entry);
