@@ -124,6 +124,25 @@ def write_pl_sheet(ws, companies, all_labels, mar_map, apr_map,
     spacer_cols = {company_start_col(ci) + 4 for ci in range(n_companies - 1)}
     pct_cols = {company_start_col(ci) + 3 for ci in range(n_companies)}
 
+    # Build set of labels that have at least one non-zero value for these companies
+    def company_has_data(label):
+        mv = mar_map.get(label, [])
+        av = apr_map.get(label, [])
+        for orig_idx, _ in companies:
+            m = mv[orig_idx] if orig_idx < len(mv) else None
+            a = av[orig_idx] if orig_idx < len(av) else None
+            if (isinstance(m, (int, float)) and m != 0) or (isinstance(a, (int, float)) and a != 0):
+                return True
+        return False
+
+    # Only always show the key P&L summary lines; everything else filters by data
+    ALWAYS_SHOW = {'Gross Profit', 'Net Operating Income', 'Net Income', 'Net Other Income'}
+
+    def should_show(label):
+        if label in ALWAYS_SHOW:
+            return True
+        return company_has_data(label)
+
     data_start_row = 4
     used_rows = []
     gp_excel_row = None
@@ -131,6 +150,8 @@ def write_pl_sheet(ws, companies, all_labels, mar_map, apr_map,
 
     for label in all_labels:
         if label in SKIP_ROWS or label == 'Consolidated P&L':
+            continue
+        if not should_show(label):
             continue
 
         excel_row = data_start_row + len(used_rows)
