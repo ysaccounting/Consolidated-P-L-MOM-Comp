@@ -127,8 +127,19 @@ def write_pl_sheet(ws, companies, all_labels, mar_map, apr_map,
             ws.cell(row=1, column=cs + 4).fill = PatternFill("solid", fgColor=SPACER_GRAY)
     ws.row_dimensions[1].height = 30
 
+    # Column A row 1: comparison title (later month over earlier month)
+    yy = str(year)[-2:]
+    a1 = ws.cell(row=1, column=1,
+                 value=f"{apr_label} '{yy} over {mar_label} '{yy} Comparison")
+    a1.font = Font(bold=True, size=10, color=NAVY, name="Arial")
+    a1.fill = PatternFill("solid", fgColor=HEADER_ACCENT)
+    a1.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+
     # Row 2: Sub-headers — light accent fill, dark text
-    ws.cell(row=2, column=1).fill = PatternFill("solid", fgColor=WHITE)
+    a2 = ws.cell(row=2, column=1, value="Account")
+    a2.font = Font(bold=True, size=9, color=NAVY, name="Arial")
+    a2.fill = PatternFill("solid", fgColor=HEADER_ACCENT)
+    a2.alignment = Alignment(horizontal="left", vertical="center")
     for ci in range(n_companies):
         cs = company_start_col(ci)
         for j, hdr in enumerate([mar_label[:3], apr_label[:3], "$ Chg", "% Chg"]):
